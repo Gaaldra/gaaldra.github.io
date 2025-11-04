@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizador de Matriz C#</title>
+    <!-- Carrega Tailwind CSS para estilização moderna e responsiva -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Define a fonte Inter como principal */
+        :root {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Estilos base para células de input */
+        .array-cell {
+            @apply p-2 text-center text-sm md:text-base bg-gray-700 border border-gray-600 rounded-lg transition duration-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
+            width: 100%; /* Garante que preencha o slot da grid */
+        }
+        /* Estilo para a grade da matriz */
+        .array-grid-container {
+            /* Flexível, permite rolagem horizontal se necessário */
+            overflow-x: auto;
+            max-width: 100%;
+        }
+        .array-grid {
+            /* Usa CSS Grid para o layout principal da matriz */
+            display: grid;
+            gap: 8px; /* Espaçamento entre as células */
+            padding: 16px;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen p-4 md:p-8">
+
+    <div class="max-w-4xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-3xl md:text-4xl font-extrabold text-blue-400">Visualizador de Matriz C#</h1>
+            <p class="text-gray-400 mt-2">Cole a declaração de sua matriz C# e visualize-a como uma grade editável.</p>
+        </header>
+
+        <!-- Área de Input C# -->
+        <section class="bg-gray-800 p-6 rounded-xl shadow-2xl mb-8">
+            <label for="csharp-code" class="block text-lg font-medium mb-3 text-white">
+                Código C# da Matriz (Exemplos: <span class="font-mono">new int[5]</span> ou <span class="font-mono">new string[3, 4]</span>)
+            </label>
+            <textarea id="csharp-code" rows="4" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-lg text-white font-mono focus:ring-blue-500 focus:border-blue-500 resize-none" placeholder="Ex: int[,] matriz = new int[3, 4];"></textarea>
+            
+            <button onclick="parseArray()" class="mt-4 w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition duration-300 shadow-lg transform hover:scale-[1.01]">
+                Visualizar Matriz
+            </button>
+        </section>
+
+        <!-- Área de Status e Erro -->
+        <div id="status-message" class="text-center p-3 rounded-lg font-medium transition duration-300 mb-6 hidden"></div>
+
+        <!-- Área de Visualização da Matriz -->
+        <section class="bg-gray-800 p-6 rounded-xl shadow-2xl">
+            <h2 class="text-xl md:text-2xl font-semibold text-white mb-4 border-b border-gray-700 pb-2">
+                Grade da Matriz
+            </h2>
+            <div id="array-grid-container" class="array-grid-container">
+                <div id="array-grid" class="array-grid">
+                    <!-- A grade de inputs será renderizada aqui -->
+                    <p class="text-gray-500 italic text-center col-span-full">A grade aparecerá após a inserção e visualização do código C#.</p>
+                </div>
+            </div>
+            
+            <!-- Exportar Dados (Apenas para demonstração de como acessar) -->
+            <button onclick="exportData()" class="mt-6 w-full py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg transition duration-300">
+                Exportar Dados Inseridos (Console)
+            </button>
+        </section>
+
+    </div>
+
+    <!-- Script JavaScript para a lógica de parsing e renderização -->
+    <script>
+        // Variável global para armazenar as dimensões da matriz
+        let currentArray = { rows: 0, cols: 0, dimensions: 0 };
+
+        /**
+         * Funções de utilidade para a mensagem de status (substitui alert)
+         * @param {string} message - A mensagem a ser exibida.
+         * @param {string} type - O tipo de mensagem ('success' ou 'error').
+         */
+        function showStatus(message, type = 'success') {
+            const statusDiv = document.getElementById('status-message');
+            statusDiv.textContent = message;
+            statusDiv.classList.remove('hidden', 'bg-red-800', 'bg-green-800');
+
+            if (type === 'error') {
+                statusDiv.classList.add('bg-red-800');
+            } else {
+                statusDiv.classList.add('bg-green-800');
+            }
+            
+            // Re-exibe após remover 'hidden'
+            setTimeout(() => {
+                statusDiv.classList.remove('hidden');
+            }, 10);
+        }
+
+        /**
+         * Tenta analisar o código C# para extrair as dimensões da matriz.
+         */
+        function parseArray() {
+            const code = document.getElementById('csharp-code').value;
+            const cleanCode = code.replace(/\s+/g, ' ').trim(); // Normaliza espaços
+
+            // Regex para matriz bidimensional (e.g., new int[3, 4])
+            const regex2D = /new\s+\w+\s*\[\s*(\d+)\s*,\s*(\d+)\s*\]/i;
+            const match2D = cleanCode.match(regex2D);
+
+            // Regex para matriz unidimensional (e.g., new int[5])
+            const regex1D = /new\s+\w+\s*\[\s*(\d+)\s*\]/i;
+            const match1D = cleanCode.match(regex1D);
+
+            let rows = 0;
+            let cols = 0;
+            let dimensions = 0;
+            
+            document.getElementById('array-grid').innerHTML = ''; // Limpa a grade anterior
+
+            if (match2D) {
+                // Matriz Bidimensional (R, C)
+                rows = parseInt(match2D[1], 10);
+                cols = parseInt(match2D[2], 10);
+                dimensions = 2;
+                showStatus(`Matriz 2D detectada: ${rows} linhas x ${cols} colunas.`, 'success');
+            } else if (match1D) {
+                // Matriz Unidimensional (N)
+                // Tratamos como 1 linha x N colunas para visualização
+                rows = 1;
+                cols = parseInt(match1D[1], 10);
+                dimensions = 1;
+                showStatus(`Matriz 1D detectada: ${cols} elementos. Renderizada como 1 linha x ${cols} colunas.`, 'success');
+            } else {
+                // Nenhum padrão encontrado
+                showStatus('Erro: Declaração de matriz C# (new Type[N] ou new Type[R, C]) não encontrada.', 'error');
+                currentArray = { rows: 0, cols: 0, dimensions: 0 };
+                return;
+            }
+
+            // Atualiza o estado global e renderiza a grade
+            currentArray = { rows, cols, dimensions };
+            renderGrid(rows, cols);
+        }
+
+        /**
+         * Renderiza a grade de inputs HTML baseada nas dimensões.
+         * @param {number} rows - Número de linhas.
+         * @param {number} cols - Número de colunas.
+         */
+        function renderGrid(rows, cols) {
+            const gridContainer = document.getElementById('array-grid');
+            gridContainer.innerHTML = ''; // Limpa conteúdo anterior
+
+            if (rows <= 0 || cols <= 0) {
+                 gridContainer.innerHTML = '<p class="text-gray-500 italic text-center col-span-full">Dimensões inválidas (0 ou negativas).</p>';
+                 return;
+            }
+
+            // Define o número de colunas do CSS Grid. Limita a 10 colunas no máximo no desktop para melhor visualização.
+            // Para mais colunas, o 'overflow-x: auto' da div pai (array-grid-container) irá permitir a rolagem.
+            const maxColsDisplay = Math.min(cols, 10);
+            
+            // Aplica o estilo dinâmico para o layout da grade
+            const gridElement = document.getElementById('array-grid');
+            gridElement.style.gridTemplateColumns = `repeat(${cols}, minmax(100px, 1fr))`;
+            gridElement.style.maxWidth = `${(cols * 116) + 32}px`; // (100px width + 8px gap on each side) * cols + padding (32px)
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const cellInput = document.createElement('input');
+                    cellInput.type = 'text';
+                    cellInput.className = 'array-cell';
+                    cellInput.id = `cell-${r}-${c}`;
+                    
+                    // Adiciona o índice como placeholder/tooltip
+                    const indexLabel = (rows > 1) ? `[${r}, ${c}]` : `[${c}]`; // Bidimensional ou Unidimensional
+                    cellInput.placeholder = indexLabel;
+                    cellInput.title = indexLabel;
+
+                    gridContainer.appendChild(cellInput);
+                }
+            }
+
+            if (cols > 10) {
+                showStatus(`Matriz grande (${rows}x${cols}). Pode ser necessário rolar horizontalmente para ver todas as colunas.`, 'success');
+            }
+        }
+
+        /**
+         * Coleta os dados atualmente inseridos e os imprime no console.
+         */
+        function exportData() {
+            if (currentArray.rows === 0) {
+                showStatus('Nenhuma matriz foi renderizada para exportar dados.', 'error');
+                return;
+            }
+
+            const { rows, cols, dimensions } = currentArray;
+            
+            // Para matriz 1D, usamos um array simples.
+            // Para matriz 2D, usamos um array de arrays (matriz).
+            const data = (dimensions === 1) ? [] : Array.from({ length: rows }, () => Array(cols).fill(null));
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const inputElement = document.getElementById(`cell-${r}-${c}`);
+                    const value = inputElement ? inputElement.value : null;
+                    
+                    if (dimensions === 1) {
+                        // Matriz 1D: mapeia c para o índice único
+                        data[c] = value;
+                    } else {
+                        // Matriz 2D: mapeia para [r][c]
+                        data[r][c] = value;
+                    }
+                }
+            }
+
+            console.log("--- Dados da Matriz Exportados ---");
+            console.log(`Dimensões detectadas: ${dimensions}D, ${rows}x${cols}`);
+            console.log("Estrutura de Dados (JSON):", data);
+            
+            showStatus('Dados coletados com sucesso e exportados para o Console (F12).', 'success');
+        }
+
+        // Inicializa o código, se houver algum no textarea
+        window.onload = () => {
+             document.getElementById('csharp-code').value = 'string[,] nomes = new string[3, 3];';
+             showStatus("Bem-vindo! Insira uma declaração de matriz C# para começar a visualizar.", 'success');
+        };
+    </script>
+</body>
+</html>
